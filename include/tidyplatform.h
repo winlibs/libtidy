@@ -455,7 +455,9 @@ extern "C" {
 #define utimbuf _utimbuf /* Windows seems to want utimbuf */
 #define stat _stat
 #define utime _utime
+#ifndef vsnprintf
 #define vsnprintf _vsnprintf
+#endif
 #endif /* _WIN32 */
 
 #endif /* PRESERVE_FILE_TIMES */
@@ -475,7 +477,9 @@ extern "C" {
 #endif
 
 #define access _access
+#ifndef strcasecmp
 #define strcasecmp _stricmp
+#endif
 
 #ifndef va_copy
 #define va_copy(dest, src) (dest = src)
