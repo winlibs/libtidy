@@ -140,6 +140,12 @@ set ( CFILES
 set ( HFILES
         ${INCDIR}/tidyplatform.h ${INCDIR}/tidy.h         ${INCDIR}/tidyenum.h
         ${INCDIR}/tidybuffio.h )
+
+option (TIDY_COMPAT_HEADERS "If set to ON, compatability headers are included" OFF)
+if (TIDY_COMPAT_HEADERS)
+    set ( HFILES ${HFILES}      ${INCDIR}/buffio.h        ${INCDIR}/platform.h )
+endif ()
+
 set ( LIBHFILES
         ${SRCDIR}/access.h       ${SRCDIR}/attrs.h        ${SRCDIR}/attrdict.h ${SRCDIR}/charsets.h
         ${SRCDIR}/clean.h        ${SRCDIR}/config.h       ${SRCDIR}/entities.h
@@ -326,7 +332,7 @@ set(CPACK_PACKAGE_VERSION_MINOR "${TIDY_MINOR_VERSION}")
 set(CPACK_PACKAGE_VERSION_PATCH "${TIDY_POINT_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README/README.html")
 
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/README/LICENSE.txt")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/README/LICENSE.md")
 set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README/README.html")
 set(CPACK_RESOURCE_FILE_WELCOME "${CMAKE_CURRENT_SOURCE_DIR}/README/README.html")
 

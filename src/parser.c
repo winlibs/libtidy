@@ -328,7 +328,6 @@ static Bool CanPrune( TidyDocImpl* doc, Node *element )
     if (nodeIsDD(element))
         return no;
 
-
     return yes;
 }
 
@@ -2514,7 +2513,14 @@ void TY_(ParseList)(TidyDocImpl* doc, Node *list, GetTokenMode ARG_UNUSED(mode))
             continue;
         }
 
-        if ( !nodeIsLI(node) )
+        if ( nodeIsLI(node) || TY_(IsHTML5Mode)(doc))
+        {
+            /* node is <LI> 
+               Issue #396 - A <ul> can have Zero or more li elements
+             */
+            TY_(InsertNodeAtEnd)(list,node);
+        }
+        else
         {
             TY_(UngetToken)( doc );
 
@@ -2567,9 +2573,6 @@ void TY_(ParseList)(TidyDocImpl* doc, Node *list, GetTokenMode ARG_UNUSED(mode))
                 TY_(InsertNodeAtEnd)(list,node);
             }
         }
-        else
-            /* node is <LI> */
-            TY_(InsertNodeAtEnd)(list,node);
 
         ParseTag( doc, node, IgnoreWhitespace);
     }
@@ -3016,9 +3019,22 @@ void TY_(ParseTableTag)(TidyDocImpl* doc, Node *table, GetTokenMode ARG_UNUSED(m
     
     while ((node = TY_(GetToken)(doc, IgnoreWhitespace)) != NULL)
     {
-        if (node->tag == table->tag && node->type == EndTag)
+        if (node->tag == table->tag )
         {
-            TY_(FreeNode)( doc, node);
+            if (node->type == EndTag)
+            {
+                TY_(FreeNode)(doc, node);
+            }
+            else
+            {
+                /* Issue #498 - If a <table> in a <table>
+                 * just close the current table, and issue a 
+                 * warning. The previous action was to discard
+                 * this second <table>
+                 */
+                TY_(UngetToken)(doc);
+                TY_(ReportError)(doc, table, node, TAG_NOT_ALLOWED_IN);
+            }
             lexer->istackbase = istackbase;
             table->closed = yes;
 #if !defined(NDEBUG) && defined(_MSC_VER)
@@ -3848,7 +3864,15 @@ Bool TY_(FindNodeWithId)( Node *node, TidyTagId tid )
     {
         if (TagIsId(node,tid))
             return yes;
-        for (content = node->content; content; content = content->content)
+        /*\ 
+         *   Issue #459 - Under certain circumstances, with many node this use of
+         *   'for (content = node->content; content; content = content->content)'
+         *   would produce a **forever** circle, or at least a very extended loop...
+         *   It is sufficient to test the content, if it exists,
+         *   to quickly iterate all nodes. Now all nodes are tested only once.
+        \*/ 
+        content = node->content;
+        if (content)
         {
             if (TY_(FindNodeWithId)(content,tid))
                 return yes;
@@ -4019,9 +4043,9 @@ void TY_(ParseBody)(TidyDocImpl* doc, Node *body, GetTokenMode mode)
         */
         lexer->excludeBlocks = no;
         
-        if ( nodeIsINPUT(node) ||
+        if (( nodeIsINPUT(node) ||
              (!TY_(nodeHasCM)(node, CM_BLOCK) && !TY_(nodeHasCM)(node, CM_INLINE))
-           )
+           ) && !TY_(IsHTML5Mode)(doc) )
         {
             /* avoid this error message being issued twice */
             if (!(node->tag->model & CM_HEAD))

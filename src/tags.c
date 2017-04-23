@@ -301,7 +301,7 @@ static Dict tag_defs[] =
   { TidyTag_CANVAS,      "canvas",       VERS_ELEM_CANVAS,      &TY_(W3CAttrsFor_CANVAS)[0],      (CM_BLOCK),                    TY_(ParseBlock),     NULL           },
   { TidyTag_COMMAND,     "command",      VERS_ELEM_COMMAND,     &TY_(W3CAttrsFor_COMMAND)[0],     (CM_HEAD|CM_INLINE|CM_EMPTY),  TY_(ParseEmpty),     NULL           },
   { TidyTag_DATALIST,    "datalist",     VERS_ELEM_DATALIST,    &TY_(W3CAttrsFor_DATALIST)[0],    (CM_INLINE|CM_FIELD),          TY_(ParseDatalist),  NULL           },
-  //{ TidyTag_DATALIST,    "datalist",     VERS_ELEM_DATALIST,    &TY_(W3CAttrsFor_DATALIST)[0],    (CM_FIELD),                   TY_(ParseInline),    NULL           },
+  /* { TidyTag_DATALIST,    "datalist",     VERS_ELEM_DATALIST,    &TY_(W3CAttrsFor_DATALIST)[0],    (CM_FIELD),                   TY_(ParseInline),    NULL           },*/
   { TidyTag_DETAILS,     "details",      VERS_ELEM_DETAILS,     &TY_(W3CAttrsFor_DETAILS)[0],     (CM_BLOCK),                    TY_(ParseBlock),     NULL           },
   { TidyTag_DIALOG,      "dialog",       VERS_ELEM_DIALOG,      &TY_(W3CAttrsFor_DIALOG)[0],      (CM_BLOCK),                    TY_(ParseBlock),     NULL           },
   { TidyTag_EMBED,       "embed",        VERS_ELEM_EMBED,       &TY_(W3CAttrsFor_EMBED)[0],       (CM_INLINE|CM_IMG|CM_EMPTY),   TY_(ParseEmpty),     NULL           },
@@ -780,6 +780,12 @@ void TY_(AdjustTags)( TidyDocImpl *doc )
     }
 }
 
+Bool TY_(IsHTML5Mode)( TidyDocImpl *doc )
+{
+    return doc->HTML5Mode;
+}
+
+
 /*\
  * Issue #285
  * Reset the table to default HTML5 mode.
@@ -809,6 +815,7 @@ void TY_(ResetTags)( TidyDocImpl *doc )
 #if ELEMENT_HASH_LOOKUP
     tagsEmptyHash( doc, tags ); /* not sure this is really required, but to be sure */
 #endif
+    doc->HTML5Mode = yes;   /* set HTML5 mode */
 }
 
 void TY_(FreeTags)( TidyDocImpl* doc )
@@ -823,6 +830,8 @@ void TY_(FreeTags)( TidyDocImpl* doc )
 
     /* get rid of dangling tag references */
     TidyClearMemory( tags, sizeof(TidyTagImpl) );
+
+    doc->HTML5Mode = no;    /* reset html5 mode == legacy html4 mode */
 }
 
 
