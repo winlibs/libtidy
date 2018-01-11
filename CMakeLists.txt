@@ -174,7 +174,7 @@ if (NOT INCLUDE_INSTALL_DIR)
 endif ()
 
 # Always build the STATIC library
-set(name tidy-static)
+set(name tidy_a)
 add_library ( ${name} STATIC ${CFILES} ${HFILES} ${LIBHFILES} )
 set_target_properties( ${name} PROPERTIES 
     OUTPUT_NAME ${LIB_NAME}s
@@ -191,7 +191,7 @@ install( FILES ${HFILES} DESTINATION ${INCLUDE_INSTALL_DIR} )
 ########################################
 # if user option still on
 if (BUILD_SHARED_LIB)
-    set(name tidy-share)
+    set(name tidy)
     add_library ( ${name} SHARED ${CFILES} ${HFILES} ${LIBHFILES} )
     set_target_properties( ${name} PROPERTIES 
                                     OUTPUT_NAME ${LIB_NAME} )
@@ -214,7 +214,7 @@ endif ()
 
 ##########################################################
 ### main executable - linked with STATIC/SHARED library
-set(name ${LIB_NAME})
+set(name ${LIB_NAME}exe)
 set ( BINDIR console )
 add_executable( ${name} ${BINDIR}/tidy.c )
 target_link_libraries( ${name} ${add_LIBS} )
