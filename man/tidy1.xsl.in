@@ -26,6 +26,9 @@
 -->
 
 <xsl:variable name="CONFIG" select="document('@TIDYCONFIG@')"/>
+<xsl:variable name="ENABLE_CONFIG_FILES" select="'@ENABLE_CONFIG_FILES@'"/>
+<xsl:variable name="TIDY_CONFIG_FILE" select="'@TIDY_CONFIG_FILE@'"/>
+<xsl:variable name="TIDY_USER_CONFIG_FILE" select="'@TIDY_USER_CONFIG_FILE@'"/>
 
 <!-- Main Template: -->
 <xsl:template match="/">
@@ -160,6 +163,20 @@ since you will probably invoke \fBtidy\fR from different directories.
 The value of HTML_TIDY will be parsed after the compiled-in default
 (defined with -DTIDY_CONFIG_FILE), but before any of the files specified
 using \fB-config\fR.
+<xsl:if test="$ENABLE_CONFIG_FILES = 'ON'">
+.TP
+.B RUNTIME CONFIGURATION FILES
+You can also specify runtime configuration files from which \fBtidy\fR will
+attempt to load a configuration automatically.
+.IP
+The system runtime configuration file (<xsl:value-of select="$TIDY_CONFIG_FILE" />),
+if it exists will be loaded and applied first, followed by the user runtime
+configuration file (<xsl:value-of select="$TIDY_USER_CONFIG_FILE" />).
+Subsequent usage of a specific option will override any previous usage.
+.IP
+Note that if you use the \fBHTML_TIDY\fR environment variable, then the user
+runtime configuration file will not be used. This is a feature, not a bug.
+</xsl:if>
 .SH "EXIT STATUS"
 .IP 0
 All input files were processed successfully.
@@ -234,27 +251,52 @@ There were errors.
 </xsl:template>
 
 <xsl:template name="show-config-options">
-.SS HTML, XHTML, XML options<xsl:text/>
+.SS Document Display options<xsl:text/>
   <xsl:call-template name="config-detail">
-    <xsl:with-param name="category">markup</xsl:with-param>
+    <xsl:with-param name="category">TidyDisplay</xsl:with-param>
+  </xsl:call-template>
+.SS Document In and Out options
+  <xsl:call-template name="config-detail">
+    <xsl:with-param name="category">TidyDocumentIO</xsl:with-param>
+  </xsl:call-template>
+.SS File Input-Output options
+  <xsl:call-template name="config-detail">
+    <xsl:with-param name="category">TidyFileIO</xsl:with-param>
   </xsl:call-template>
 .SS Diagnostics options
   <xsl:call-template name="config-detail">
-    <xsl:with-param name="category">diagnostics</xsl:with-param>
+    <xsl:with-param name="category">TidyDiagnostics</xsl:with-param>
+  </xsl:call-template>
+.SS Encoding options
+  <xsl:call-template name="config-detail">
+    <xsl:with-param name="category">TidyEncoding</xsl:with-param>
+  </xsl:call-template>
+.SS Cleanup options
+  <xsl:call-template name="config-detail">
+    <xsl:with-param name="category">TidyMarkupCleanup</xsl:with-param>
+  </xsl:call-template>
+.SS Entities options
+  <xsl:call-template name="config-detail">
+    <xsl:with-param name="category">TidyMarkupEntities</xsl:with-param>
+  </xsl:call-template>
+.SS Repair options
+  <xsl:call-template name="config-detail">
+    <xsl:with-param name="category">TidyMarkupRepair</xsl:with-param>
+  </xsl:call-template>
+.SS Transformation options
+  <xsl:call-template name="config-detail">
+    <xsl:with-param name="category">TidyMarkupXForm</xsl:with-param>
+  </xsl:call-template>
+.SS Teaching Tidy options
+  <xsl:call-template name="config-detail">
+    <xsl:with-param name="category">TidyMarkupTeach</xsl:with-param>
   </xsl:call-template>
 .SS Pretty Print options
   <xsl:call-template name="config-detail">
-    <xsl:with-param name="category">print</xsl:with-param>
-  </xsl:call-template>
-.SS Character Encoding options
-  <xsl:call-template name="config-detail">
-    <xsl:with-param name="category">encoding</xsl:with-param>
-  </xsl:call-template>
-.SS Miscellaneous options
-  <xsl:call-template name="config-detail">
-    <xsl:with-param name="category">misc</xsl:with-param>
+    <xsl:with-param name="category">TidyPrettyPrint</xsl:with-param>
   </xsl:call-template>
 </xsl:template>
+
 
 <!--
   Note that any templates called implicitly or explicitly

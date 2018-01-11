@@ -15,6 +15,7 @@
 #include "attrs.h"
 #include "pprint.h"
 #include "access.h"
+#include "message.h"
 
 #ifndef MAX
 #define MAX(a,b) (((a) > (b))?(a):(b))
@@ -40,27 +41,26 @@ struct _TidyDocImpl
     Lexer*              lexer;
 
     /* Config + Markup Declarations */
-    TidyConfigImpl      config;
-    TidyTagImpl         tags;
-    TidyAttribImpl      attribs;
-
-#if SUPPORT_ACCESSIBILITY_CHECKS
-    /* Accessibility Checks state */
-    TidyAccessImpl      access;
-#endif
+    TidyConfigImpl          config;
+    TidyTagImpl             tags;
+    TidyAttribImpl          attribs;
+    TidyAccessImpl          access;
+    TidyMutedMessages       muted;
 
     /* The Pretty Print buffer */
     TidyPrintImpl       pprint;
 
     /* I/O */
-    StreamIn*           docIn;
-    StreamOut*          docOut;
-    StreamOut*          errout;
-    TidyReportFilter    mssgFilt;
-    TidyReportFilter2   mssgFilt2;
-    TidyReportFilter3   mssgFilt3;
-    TidyOptCallback     pOptCallback;
-    TidyPPProgress      progressCallback;
+    StreamIn*                docIn;
+    StreamOut*               docOut;
+    StreamOut*               errout;
+    TidyReportFilter         reportFilter;
+    TidyReportCallback       reportCallback;
+    TidyMessageCallback      messageCallback;
+    TidyOptCallback          pOptCallback;
+    TidyConfigCallback       pConfigCallback;
+    TidyConfigChangeCallback pConfigChangeCallback;
+    TidyPPProgress           progressCallback;
 
     /* Parse + Repair Results */
     uint                optionErrors;
@@ -75,8 +75,10 @@ struct _TidyDocImpl
     uint                badLayout;   /* for bad style errors */
     uint                badChars;    /* for bad char encodings */
     uint                badForm;     /* bit field, for badly placed form tags, or other format errors */
+    uint                footnotes;   /* bit field, for other footnotes, until formalized */
 
-    Bool                HTML5Mode;  /* current mode is html5 */
+    Bool                HTML5Mode;   /* current mode is html5 */
+    Bool                xmlDetected; /* true if XML was used/detected */
 
     /* Memory allocator */
     TidyAllocator*      allocator;
@@ -86,45 +88,64 @@ struct _TidyDocImpl
     uint                nClassId;
     Bool                inputHadBOM;
 
-#ifdef TIDY_STORE_ORIGINAL_TEXT
-    Bool                storeText;
-#endif
-
 #if PRESERVE_FILE_TIMES
     struct utimbuf      filetimes;
 #endif
     tmbstr              givenDoctype;
 };
 
+/** The basic struct for communicating a message within LibTidy. All of the
+**  relevant information pertaining to a message can be retrieved with the
+**  accessor functions and one of these records.
+*/
+struct _TidyMessageImpl
+{
+    TidyDocImpl         *tidyDoc;     /* document instance this message is attributed to */
+    Node                *tidyNode;    /* the node reporting the message, if applicable */
+    uint                code;         /* the message code */
+    int                 line;         /* the line message applies to */
+    int                 column;       /* the column the message applies to */
+    TidyReportLevel     level;        /* the severity level of the message */
+    Bool                allowMessage; /* indicates whether or not a filter rejected a message */
+    Bool                muted;        /* indicates whether or not a configuration mutes this message */
+    
+    int                 argcount;    /* the number of arguments */
+    struct printfArg*   arguments;   /* the arguments' values and types */
 
-/* Twizzle internal/external types */
-#ifdef NEVER
-TidyDocImpl* tidyDocToImpl( TidyDoc tdoc );
-TidyDoc      tidyImplToDoc( TidyDocImpl* impl );
+    ctmbstr             messageKey;             /* the message code as a key string */
 
-Node*        tidyNodeToImpl( TidyNode tnod );
-TidyNode     tidyImplToNode( Node* node );
+    ctmbstr             messageFormatDefault;   /* the built-in format string */
+    ctmbstr             messageFormat;          /* the localized format string */
 
-AttVal*      tidyAttrToImpl( TidyAttr tattr );
-TidyAttr     tidyImplToAttr( AttVal* attval );
+    tmbstr              messageDefault;         /* the message, formatted, default language */
+    tmbstr              message;                /* the message, formatted, localized */
 
-const TidyOptionImpl* tidyOptionToImpl( TidyOption topt );
-TidyOption   tidyImplToOption( const TidyOptionImpl* option );
-#else
+    tmbstr              messagePosDefault;      /* the position part, default language */
+    tmbstr              messagePos;             /* the position part, localized */
 
-#define tidyDocToImpl( tdoc )       ((TidyDocImpl*)(tdoc))
-#define tidyImplToDoc( doc )        ((TidyDoc)(doc))
+    ctmbstr             messagePrefixDefault;   /* the prefix part, default language */
+    ctmbstr             messagePrefix;          /* the prefix part, localized */
+    
+    tmbstr              messageOutputDefault;   /* the complete string Tidy would output */
+    tmbstr              messageOutput;          /* the complete string, localized */
+};
 
-#define tidyNodeToImpl( tnod )      ((Node*)(tnod))
-#define tidyImplToNode( node )      ((TidyNode)(node))
 
-#define tidyAttrToImpl( tattr )     ((AttVal*)(tattr))
-#define tidyImplToAttr( attval )    ((TidyAttr)(attval))
+#define tidyDocToImpl( tdoc )           ((TidyDocImpl*)(tdoc))
+#define tidyImplToDoc( doc )            ((TidyDoc)(doc))
 
-#define tidyOptionToImpl( topt )    ((const TidyOptionImpl*)(topt))
-#define tidyImplToOption( option )  ((TidyOption)(option))
+#define tidyMessageToImpl( tmessage )   ((TidyMessageImpl*)(tmessage))
+#define tidyImplToMessage( message )    ((TidyMessage)(message))
 
-#endif
+#define tidyNodeToImpl( tnod )          ((Node*)(tnod))
+#define tidyImplToNode( node )          ((TidyNode)(node))
+
+#define tidyAttrToImpl( tattr )         ((AttVal*)(tattr))
+#define tidyImplToAttr( attval )        ((TidyAttr)(attval))
+
+#define tidyOptionToImpl( topt )        ((const TidyOptionImpl*)(topt))
+#define tidyImplToOption( option )      ((TidyOption)(option))
+
 
 /** Wrappers for easy memory allocation using the document's allocator */
 #define TidyDocAlloc(doc, size) TidyAlloc((doc)->allocator, size)

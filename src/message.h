@@ -1,253 +1,279 @@
 #ifndef __MESSAGE_H__
 #define __MESSAGE_H__
 
-/* message.h -- general message writing routines
-
-  (c) 1998-2007 (W3C) MIT, ERCIM, Keio University
-  See tidy.h for the copyright notice.
-
-*/
+/******************************************************************************
+ * @file
+ * Provides General Message Writing Routines
+ *
+ * This module handles LibTidy's high level output routines, as well as
+ * provides lookup functions and management for keys used for retrieval
+ * of these messages.
+ *
+ * LibTidy emits two general types of output:
+ *
+ *  - Reports, which contain data relating to what Tidy discovered in your
+ *    source file, and/or what Tidy did to your source file. In some cases
+ *    general information about your source file is emitted as well. Reports
+ *    are emitted in the current output buffer, but LibTidy users will probably
+ *    prefer to hook into a callback in order to take advantage of the data
+ *    that are available in a more flexible way.
+ *
+ *  - Dialogue, consisting of footnotes related to your source file, and of
+ *    general information that's not related to your source file in particular.
+ *    This is also written to the current output buffer when appropriate, and
+ *    available via callbacks.
+ *
+ * Report information typically takes the form of a warning, an error, info,
+ * etc., and the output routines keep track of the count of these.
+ *
+ * The preferred way of handling Tidy diagnostics output is either
+ *   - define a new output sink, or
+ *   - use a message filter callback routine.
+ *
+ * @author  HTACG, et al (consult git log)
+ * 
+ * @copyright
+ *     Copyright (c) 1998-2017 World Wide Web Consortium (Massachusetts
+ *     Institute of Technology, European Research Consortium for Informatics
+ *     and Mathematics, Keio University) and HTACG.
+ * @par
+ *     All Rights Reserved.
+ * @par
+ *     See `tidy.h` for the complete license.
+ *
+ * @date Additional updates: consult git log
+ *
+ ******************************************************************************/
 
 #include "forward.h"
-#include "tidy.h"  /* For TidyReportLevel */
-#include "language.h"
+#include "config.h"
 
-/* General message writing routines.
-** Each message is a single warning, error, etc.
-**
-** These routines keep track of counts and,
-** if the caller has set a filter, it will be
-** called. The new preferred way of handling
-** Tidy diagnostics output is either a) define
-** a new output sink or b) install a message
-** filter routine.
-**
-** Keep track of ShowWarnings, ShowErrors, etc.
-*/
+/** @addtogroup internal_api */
+/** @{ */
 
+
+/***************************************************************************//**
+ ** @defgroup message_releaseinfo Tidy Release Information
+ **
+ ** These functions return information about the current release version date
+ ** and version number. Note that the latest release date or the highest
+ ** version number alone do not guarantee the latest Tidy release, as we may
+ ** backport important fixes to older releases of Tidy.
+ **
+ ** @{
+ ******************************************************************************/
+
+/**
+ *  Returns the release date of this instance of HTML Tidy.
+ */
 ctmbstr TY_(ReleaseDate)(void);
 
-void TY_(ReportUnknownOption)( TidyDocImpl* doc, ctmbstr option );
+/** 
+ *  Returns the release version of this instance of HTML Tidy.
+ */
+ctmbstr TY_(tidyLibraryVersion)(void);
+
+
+/** @} message_releaseinfo group */
+
+
+/***************************************************************************//**
+ ** @defgroup message_reporting Report and Dialogue Writing Functions
+ **
+ ** These simple functions perform the vast majority of Tidy's output, and
+ ** one these should be your first choice when adding your own output.
+ **
+ ** A report is typically diagnostic output that is generated each time Tidy
+ ** detects an issue in your document or makes a change. A dialogue is a piece
+ ** of information such as a summary, a footnote, or other non-tabular data.
+ ** Some of these functions emit multiple reports or dialogue in order to
+ ** effect a summary.
+ **
+ ** @{
+ ******************************************************************************/
+
+/** @name General Report Writing 
+ ** If one of the convenience reporting functions does not fit your required
+ ** message signature, then this designated reporting function will fit the
+ ** bill. Be sure to see if a message formatter exists that can handle the
+ ** variable arguments.
+ */
+/** @{ */
+
+
+/**
+ *  The designated report writing function. When a proper formatter exists,
+ *  this one function can hanle all report output.
+ */
+void TY_(Report)(TidyDocImpl* doc, Node *element, Node *node, uint code, ...);
+
+
+/** @} */
+/** @name Convenience Reporting Functions
+ ** These convenience reporting functions are able to handle the bulk of Tidy's
+ ** necessary reporting, and avoid the danger of using a variadic if you are
+ ** unfamiliar with Tidy.
+ */
+/** @{ */
+
+
+void TY_(ReportAccessError)( TidyDocImpl* doc, Node* node, uint code );
+void TY_(ReportAttrError)(TidyDocImpl* doc, Node *node, AttVal *av, uint code);
 void TY_(ReportBadArgument)( TidyDocImpl* doc, ctmbstr option );
-void TY_(NeedsAuthorIntervention)( TidyDocImpl* doc );
-
-void TY_(ReportMarkupVersion)( TidyDocImpl* doc );
-void TY_(ReportNumWarnings)( TidyDocImpl* doc );
-
-void TY_(GeneralInfo)( TidyDocImpl* doc );
-/* void TY_(UnknownOption)( TidyDocImpl* doc, char c ); */
-/* void TY_(UnknownFile)( TidyDocImpl* doc, ctmbstr program, ctmbstr file ); */
-void TY_(FileError)( TidyDocImpl* doc, ctmbstr file, TidyReportLevel level );
-
-void TY_(ErrorSummary)( TidyDocImpl* doc );
-
-void TY_(ReportEncodingWarning)(TidyDocImpl* doc, uint code, uint encoding);
-void TY_(ReportEncodingError)(TidyDocImpl* doc, uint code, uint c, Bool discarded);
 void TY_(ReportEntityError)( TidyDocImpl* doc, uint code, ctmbstr entity, int c );
-void TY_(ReportAttrError)( TidyDocImpl* doc, Node* node, AttVal* av, uint code );
+void TY_(ReportFileError)( TidyDocImpl* doc, ctmbstr file, uint code );
+void TY_(ReportEncodingError)(TidyDocImpl* doc, uint code, uint c, Bool discarded);
+void TY_(ReportEncodingWarning)(TidyDocImpl* doc, uint code, uint encoding);
 void TY_(ReportMissingAttr)( TidyDocImpl* doc, Node* node, ctmbstr name );
 void TY_(ReportSurrogateError)(TidyDocImpl* doc, uint code, uint c1, uint c2);
+void TY_(ReportUnknownOption)( TidyDocImpl* doc, ctmbstr option );
 
-#if SUPPORT_ACCESSIBILITY_CHECKS
 
-void TY_(ReportAccessWarning)( TidyDocImpl* doc, Node* node, uint code );
-void TY_(ReportAccessError)( TidyDocImpl* doc, Node* node, uint code );
-
-#endif
-
-void TY_(ReportNotice)(TidyDocImpl* doc, Node *element, Node *node, uint code);
-void TY_(ReportWarning)(TidyDocImpl* doc, Node *element, Node *node, uint code);
-void TY_(ReportError)(TidyDocImpl* doc, Node* element, Node* node, uint code);
-void TY_(ReportFatal)(TidyDocImpl* doc, Node* element, Node* node, uint code);
+/** @} */
+/** @name General Dialogue Writing
+ ** These functions produce dialogue output such as individual messages, or
+ ** several messages in summary form.
+ */
+/** @{ */
 
 
 /**
- *  These tidyErrorCodes are used throughout libtidy, and also
- *  have associated localized strings to describe them.
- *
- *  IMPORTANT: to maintain compatability with TidyMessageFilter3, if you add
- *  or remove keys from this enum, ALSO add/remove the corresponding key
- *  in language.c:tidyErrorFilterKeysStruct[]!
+ *  Emits a single dialogue message, and is capable of accepting a variadic
+ *  that is passed to the correct message formatter as needed.
  */
-typedef enum {
-    /* This MUST be present and first. */
-    CODES_TIDY_ERROR_FIRST = 200,
+void TY_(Dialogue)( TidyDocImpl* doc, uint code, ... );
 
-    /* error codes for entities/numeric character references */
 
-    MISSING_SEMICOLON,
-    MISSING_SEMICOLON_NCR,
-    UNKNOWN_ENTITY,
-    UNESCAPED_AMPERSAND,
-    APOS_UNDEFINED,
+/** @} */
+/** @name Output Dialogue Information */
+/** @{ */
 
-    /* error codes for element messages */
 
-    MISSING_ENDTAG_FOR,
-    MISSING_ENDTAG_BEFORE,
-    DISCARDING_UNEXPECTED,
-    NESTED_EMPHASIS,
-    NON_MATCHING_ENDTAG,
-    TAG_NOT_ALLOWED_IN,
-    MISSING_STARTTAG,
-    UNEXPECTED_ENDTAG,
-    USING_BR_INPLACE_OF,
-    INSERTING_TAG,
-    SUSPECTED_MISSING_QUOTE,
-    MISSING_TITLE_ELEMENT,
-    DUPLICATE_FRAMESET,
-    CANT_BE_NESTED,
-    OBSOLETE_ELEMENT,
-    PROPRIETARY_ELEMENT,
-    ELEMENT_VERS_MISMATCH_ERROR,
-    ELEMENT_VERS_MISMATCH_WARN,
-    UNKNOWN_ELEMENT,
-    TRIM_EMPTY_ELEMENT,
-    COERCE_TO_ENDTAG,
-    ILLEGAL_NESTING,
-    NOFRAMES_CONTENT,
-    CONTENT_AFTER_BODY,
-    INCONSISTENT_VERSION,
-    MALFORMED_COMMENT,
-    BAD_COMMENT_CHARS,
-    BAD_XML_COMMENT,
-    BAD_CDATA_CONTENT,
-    INCONSISTENT_NAMESPACE,
-    DOCTYPE_AFTER_TAGS,
-    MALFORMED_DOCTYPE,
-    UNEXPECTED_END_OF_FILE,
-    DTYPE_NOT_UPPER_CASE,
-    TOO_MANY_ELEMENTS,
-    UNESCAPED_ELEMENT,
-    NESTED_QUOTATION,
-    ELEMENT_NOT_EMPTY,
-    ENCODING_IO_CONFLICT,
-    MIXED_CONTENT_IN_BLOCK,
-    MISSING_DOCTYPE,
-    SPACE_PRECEDING_XMLDECL,
-    TOO_MANY_ELEMENTS_IN,
-    UNEXPECTED_ENDTAG_IN,
-    REPLACING_ELEMENT,
-    REPLACING_UNEX_ELEMENT,
-    COERCE_TO_ENDTAG_WARN,
+/** 
+ *  Outputs the footnotes and other dialogue information after document cleanup
+ *  is complete. LibTidy users might consider capturing these individually in
+ *  the message callback rather than capturing this entire buffer.
+ *  Called by `tidyErrorSummary()`, in console.
+ *  @todo: This name is a bit misleading and should probably be renamed to
+ *  indicate its focus on printing footnotes.
+ */
+void TY_(ErrorSummary)( TidyDocImpl* doc );
 
-    /* error codes used for attribute messages */
 
-    UNKNOWN_ATTRIBUTE,
-    INSERTING_ATTRIBUTE,
-    INSERTING_AUTO_ATTRIBUTE,
-    MISSING_ATTR_VALUE,
-    BAD_ATTRIBUTE_VALUE,
-    UNEXPECTED_GT,
-    PROPRIETARY_ATTRIBUTE,
-    MISMATCHED_ATTRIBUTE_ERROR,
-    MISMATCHED_ATTRIBUTE_WARN,
-    PROPRIETARY_ATTR_VALUE,
-    REPEATED_ATTRIBUTE,
-    MISSING_IMAGEMAP,
-    XML_ATTRIBUTE_VALUE,
-    UNEXPECTED_QUOTEMARK,
-    MISSING_QUOTEMARK,
-    ID_NAME_MISMATCH,
+/** 
+ *  Outputs document HTML version and version-related information as the final
+ *  report(s) in the report table.
+ *  Called by `tidyRunDiagnostics()`, from console.
+ *  Called by `tidyDocReportDoctype()`, currently unused.
+ */
+void TY_(ReportMarkupVersion)( TidyDocImpl* doc );
 
-    BACKSLASH_IN_URI,
-    FIXED_BACKSLASH,
-    ILLEGAL_URI_REFERENCE,
-    ESCAPED_ILLEGAL_URI,
-
-    NEWLINE_IN_URI,
-    ANCHOR_NOT_UNIQUE,
-
-    JOINING_ATTRIBUTE,
-    UNEXPECTED_EQUALSIGN,
-    ATTR_VALUE_NOT_LCASE,
-    XML_ID_SYNTAX,
-
-    INVALID_ATTRIBUTE,
-
-    BAD_ATTRIBUTE_VALUE_REPLACED,
-
-    INVALID_XML_ID,
-    UNEXPECTED_END_OF_FILE_ATTR,
-    MISSING_ATTRIBUTE,
-    WHITE_IN_URI,
-
-    REMOVED_HTML5,                 /* this element removed from HTML5 */
-    BAD_SUMMARY_HTML5,             /* use of summary attr removed from HTML5 */
-
-    PREVIOUS_LOCATION,             /* last */
-
-    /* character encoding errors */
-
-    VENDOR_SPECIFIC_CHARS,
-    INVALID_SGML_CHARS,
-    INVALID_UTF8,
-    INVALID_UTF16,
-    ENCODING_MISMATCH,
-    INVALID_URI,
-    INVALID_NCR,
-
-    BAD_SURROGATE_PAIR,
-    BAD_SURROGATE_TAIL,
-    BAD_SURROGATE_LEAD,
-
-    /* This MUST be present and last. */
-    CODES_TIDY_ERROR_LAST
-} tidyErrorCodes;
 
 /**
- *  These tidyMessagesMisc are used throughout libtidy, and also
- *  have associated localized strings to describe them.
+ *  Reports the number of warnings and errors found in the document as dialogue
+ *  inforation.
+ *  Called by `tidyRunDiagnostics()`, from console.
  */
-typedef enum {
-    ACCESS_URL = 2048,          /* Used to point to Web Accessibility Guidelines. */
-    ATRC_ACCESS_URL,            /* Points to Tidy's accessibility page. */
-    FILE_CANT_OPEN,             /* For retrieving a string when a file can't be opened. */
-    LINE_COLUMN_STRING,         /* For retrieving localized `line %d column %d` text. */
-    STRING_CONTENT_LOOKS,       /* `Document content looks like %s`. */
-    STRING_DISCARDING,          /* For `discarding`. */
-    STRING_DOCTYPE_GIVEN,       /* `Doctype given is \"%s\". */
-    STRING_ERROR_COUNT,         /* `%u %s, %u %s were found!`. */
-    STRING_ERROR_COUNT_ERROR,   /* `error` and `errors`. */
-    STRING_ERROR_COUNT_WARNING, /* `warning` and `warnings`. */
-    STRING_HELLO_ACCESS,        /* Accessibility hello message. */
-    STRING_HTML_PROPRIETARY,    /* `HTML Proprietary`/ */
-    STRING_MISSING_MALFORMED,   /* For `missing or malformed argument for option: %s`. */
-    STRING_NO_ERRORS,           /* `No warnings or errors were found.\n\n`. */
-    STRING_NO_SYSID,            /* `No system identifier in emitted doctype`. */
-    STRING_NOT_ALL_SHOWN,       /* ` Not all warnings/errors were shown.\n\n`. */
-    STRING_PLAIN_TEXT,          /* For retrieving a string `plain text`. */
-    STRING_REPLACING,           /* For `replacing`. */
-    STRING_SPECIFIED,           /* For `specified`. */
-    STRING_UNKNOWN_FILE,        /* `%s: can't open file \"%s\"\n`. */
-    STRING_UNKNOWN_OPTION,      /* For retrieving a string `unknown option: %s`. */
-    STRING_UNRECZD_OPTION,      /* `unrecognized option -%c use -help to list options\n`. */
-    STRING_XML_DECLARATION,     /* For retrieving a string `XML declaration`. */
-    TEXT_ACCESS_ADVICE1,        /* Explanatory text. */
-    TEXT_ACCESS_ADVICE2,        /* Explanatory text. */
-    TEXT_BAD_FORM,              /* Explanatory text. */
-    TEXT_BAD_MAIN,              /* Explanatory text. */
-    TEXT_GENERAL_INFO,          /* Explanatory text. */
-    TEXT_GENERAL_INFO_PLEA,     /* Explanatory text. */
-    TEXT_HTML_T_ALGORITHM,      /* Paragraph for describing the HTML table algorithm. */
-    TEXT_INVALID_URI,           /* Explanatory text. */
-    TEXT_INVALID_UTF16,         /* Explanatory text. */
-    TEXT_INVALID_UTF8,          /* Explanatory text. */
-    TEXT_M_IMAGE_ALT,           /* Explanatory text. */
-    TEXT_M_IMAGE_MAP,           /* Explanatory text. */
-    TEXT_M_LINK_ALT,            /* Explanatory text. */
-    TEXT_M_SUMMARY,             /* Explanatory text. */
-    TEXT_NEEDS_INTERVENTION,    /* Explanatory text. */
-    TEXT_SGML_CHARS,            /* Explanatory text. */
-    TEXT_USING_BODY,            /* Explanatory text. */
-    TEXT_USING_FONT,            /* Explanatory text. */
-    TEXT_USING_FRAMES,          /* Explanatory text. */
-    TEXT_USING_LAYER,           /* Explanatory text. */
-    TEXT_USING_NOBR,            /* Explanatory text. */
-    TEXT_USING_SPACER,          /* Explanatory text. */
-    TEXT_VENDOR_CHARS,          /* Explanatory text. */
-    TEXT_WINDOWS_CHARS          /* Explanatory text. */
-} tidyMessagesMisc;
+void TY_(ReportNumWarnings)( TidyDocImpl* doc );
+
+
+/** @} */
+/** @} message_reporting group */
+
+
+/***************************************************************************//**
+ ** @defgroup message_mutinging Message Muting
+ **
+ ** Message types included in the `mute` option will be be printed in
+ ** messageOut().
+ **
+ ** @{
+ ******************************************************************************/
+
+/** Maintains a list of messages not to display. */
+typedef struct _mutedMessages {
+    tidyStrings* list; /**< A list of messages that won't be output. */
+    uint count;        /**< Current count of the list. */
+    uint capacity;     /**< Current capacity of the list. */
+} TidyMutedMessages;
+
+
+/** Frees the list of muted messages.
+ ** @param doc The Tidy document.
+ */
+void TY_(FreeMutedMessageList)( TidyDocImpl* doc );
+
+/** Adds a new message ID to the list of muted messages.
+ ** @param doc The Tidy document.
+ ** @param opt The option that is defining the muted message.
+ ** @param name The message code as a string.
+ */
+void TY_(DefineMutedMessage)( TidyDocImpl* doc, const TidyOptionImpl* opt, ctmbstr name );
+
+/** Start an iterator for muted messages.
+ ** @param doc The Tidy document.
+ ** @returns Returns an iterator token.
+ */
+TidyIterator TY_(getMutedMessageList)( TidyDocImpl* doc );
+
+/** Get the next priority attribute.
+ ** @param doc The Tidy document.
+ ** @param iter The iterator token.
+ ** @returns The next priority attribute.
+ */
+ctmbstr TY_(getNextMutedMessage)( TidyDocImpl* doc, TidyIterator* iter );
+
+
+/** @} message_muting group */
+
+
+/***************************************************************************//**
+ ** @defgroup message_keydiscovery Key Discovery
+ **
+ ** LibTidy users may want to use `TidyReportCallback` to enable their own
+ ** localization lookup features. Because Tidy's report codes are enums the
+ ** specific values can change over time. Using these functions provides the
+ ** ability for LibTidy users to use LibTidy's enum values as strings for
+ ** lookup purposes.
+ **
+ ** @{
+ ******************************************************************************/
+
+/**
+ *  This function returns a string representing the enum value name that can
+ *  be used as a lookup key independent of changing string values. 
+ *  `TidyReportCallback` will return this general string as the report 
+ *  message key.
+ */
+ctmbstr TY_(tidyErrorCodeAsKey)(uint code);
+
+/**
+ *  Given an error code string, return the integer value of it, or UINT_MAX
+ *  as an error flag.
+ */
+uint TY_(tidyErrorCodeFromKey)(ctmbstr code);
+
+
+/**
+ *  Initializes the TidyIterator to point to the first item
+ *  in Tidy's list of error codes that can be return with
+ *  `TidyReportFilter3`.
+ *  Items can be retrieved with getNextErrorCode();
+ */
+TidyIterator TY_(getErrorCodeList)(void);
+
+/**
+ *  Returns the next error code having initialized the iterator
+ *  with `getErrorCodeList()`. You can use tidyErrorCodeAsKey
+ *  to determine the key for this value.
+ */
+uint TY_(getNextErrorCode)( TidyIterator* iter );
+
+
+/** @} message_keydiscovery group */
+/** @} internal_api addtogroup */
+
+
 
 /* accessibility flaws */
 
@@ -277,6 +303,10 @@ typedef enum {
 #define BC_ENCODING_MISMATCH       16 /* fatal error */
 #define BC_INVALID_URI             32
 #define BC_INVALID_NCR             64
+
+/* other footnote bit field (temporary until formalized) */
+
+#define FN_TRIM_EMPTY_ELEMENT     1
 
 /* Lexer and I/O Macros */
 
