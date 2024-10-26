@@ -210,7 +210,7 @@ if(WIN32 AND MSVC)
     set( MSVC_FLAGS "-DNOMINMAX -D_USE_MATH_DEFINES -D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS -D__CRT_NONSTDC_NO_WARNINGS" )
 
     # to distinguish between debug and release lib in windows
-    set( CMAKE_DEBUG_POSTFIX "d" ) # little effect in unix
+    set( CMAKE_DEBUG_POSTFIX "_debug" ) # little effect in unix
 else()
     # add any gcc flags
 endif()
@@ -397,7 +397,7 @@ endif ()
 # Static Library
 #   The static library always builds.
 #------------------------------------------------------------------------
-set(name tidy-static)
+set(name tidy_a)
 add_library ( ${name} STATIC ${CFILES} ${HFILES} ${LIBHFILES} )
 if (WIN32)
     set_target_properties( ${name} PROPERTIES 
@@ -427,7 +427,7 @@ endif()
 #   If the user option is still on.
 #------------------------------------------------------------------------
 if (BUILD_SHARED_LIB)
-    set(name tidy-share)
+    set(name tidy)
     if (UNIX AND APPLE)
         set(CMAKE_MACOSX_RPATH 1)
     endif ()
@@ -457,12 +457,12 @@ endif ()
 #   shared library.
 #------------------------------------------------------------------------
 if (SUPPORT_CONSOLE_APP)
-    set(name ${LIB_NAME})
+    set(name ${LIB_NAME}exe)
     set ( BINDIR console )
     add_executable( ${name} ${BINDIR}/tidy.c )
     target_link_libraries( ${name} ${add_LIBS} )
     if (MSVC)
-        set_target_properties( ${name} PROPERTIES DEBUG_POSTFIX d )
+        set_target_properties( ${name} PROPERTIES DEBUG_POSTFIX _debug )
     endif ()
     if (APPLE)
         string(TIMESTAMP CURRENT_YEAR "%Y")
@@ -487,7 +487,7 @@ if (BUILD_TAB2SPACE)
     set(name tab2space)
     add_executable( ${name} ${BINDIR}/tab2space.c )
     if (MSVC)
-        set_target_properties( ${name} PROPERTIES DEBUG_POSTFIX d )
+        set_target_properties( ${name} PROPERTIES DEBUG_POSTFIX _debug )
     endif ()
     # no INSTALL of this 'local' tool - use depreciated
 endif ()
@@ -497,7 +497,7 @@ if (BUILD_SAMPLE_CODE)
     set(dir console)
     add_executable( ${name} ${dir}/${name}.cxx )
     if (MSVC)
-        set_target_properties( ${name} PROPERTIES DEBUG_POSTFIX d )
+        set_target_properties( ${name} PROPERTIES DEBUG_POSTFIX _debug )
     endif ()
     target_link_libraries( ${name} ${add_LIBS} )
     # no INSTALL of this 'local' sample
