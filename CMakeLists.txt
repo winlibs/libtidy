@@ -54,6 +54,7 @@ if (LIBTIDY_VERSION)
     list(GET VERSION_LIST 0 TIDY_MAJOR_VERSION)
     list(GET VERSION_LIST 1 TIDY_MINOR_VERSION)
     list(GET VERSION_LIST 2 TIDY_POINT_VERSION)
+    set(TIDY_SO_VERSION "${TIDY_MAJOR_VERSION}${TIDY_MINOR_VERSION}")
 else ()
     message(FATAL_ERROR "*** FAILED to get a VERSION from version.txt!")
 endif ()   
@@ -66,6 +67,21 @@ if (LIBTIDY_DATE)
     list(GET DATE_LIST 2 tidy_DAY)
 else ()
     message(FATAL_ERROR "*** FAILED to get a DATE from version.txt!")
+endif ()
+
+# Establish SOVERSION. Tidy uses a weird form of semantic versioning,
+# wherein even minor versions are stable versions with SONAMEs, and
+# odd minor versions are `next` versions that should NOT be released,
+# are NOT stable, and should NOT have a valid SONAME.
+if (TIDY_SO_VERSION)
+    math(EXPR NO_SONAME "${TIDY_SO_VERSION} % 2")
+    if ( NO_SONAME EQUAL 0)
+        message("-> TIDY_SO_VERSION = ${TIDY_SO_VERSION}. This is an EVEN (stable) release.")
+    else ()
+        message("-> TIDY_SO_VERSION = ${TIDY_SO_VERSION}. This is an ODD (development) release.")
+    endif ()
+else ()
+    message(FATAL_ERROR "*** FAILED to build a TIDY_SO_VERSION!")
 endif ()
 
 
@@ -194,7 +210,7 @@ if(WIN32 AND MSVC)
     set( MSVC_FLAGS "-DNOMINMAX -D_USE_MATH_DEFINES -D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS -D__CRT_NONSTDC_NO_WARNINGS" )
 
     # to distinguish between debug and release lib in windows
-    set( CMAKE_DEBUG_POSTFIX "_debug" ) # little effect in unix
+    set( CMAKE_DEBUG_POSTFIX "d" ) # little effect in unix
 else()
     # add any gcc flags
 endif()
@@ -381,10 +397,16 @@ endif ()
 # Static Library
 #   The static library always builds.
 #------------------------------------------------------------------------
-set(name tidy_a)
+set(name tidy-static)
 add_library ( ${name} STATIC ${CFILES} ${HFILES} ${LIBHFILES} )
-set_target_properties( ${name} PROPERTIES 
-                       OUTPUT_NAME ${LIB_NAME}s )
+if (WIN32)
+    set_target_properties( ${name} PROPERTIES 
+                           OUTPUT_NAME ${LIB_NAME}_static ) 
+else ()
+    set_target_properties( ${name} PROPERTIES 
+                           OUTPUT_NAME ${LIB_NAME} )
+
+endif ()
 if (NOT TIDY_CONSOLE_SHARED) # user wants default static linkage
     list ( APPEND add_LIBS ${name} )
 endif ()    
@@ -394,14 +416,18 @@ install(TARGETS ${name}
         LIBRARY DESTINATION ${LIB_INSTALL_DIR}
         )
 install( FILES ${HFILES} DESTINATION ${INCLUDE_INSTALL_DIR} )
-
+if(MSVC)
+    # install(FILES $<TARGET_PDB_FILE:${name}> DESTINATION lib OPTIONAL)
+    INSTALL(FILES ${PROJECT_BINARY_DIR}/${name}.dir/Debug/${name}.pdb
+    DESTINATION lib CONFIGURATIONS Debug )
+endif()
 
 #------------------------------------------------------------------------
 # Dynamic Library
 #   If the user option is still on.
 #------------------------------------------------------------------------
 if (BUILD_SHARED_LIB)
-    set(name tidy)
+    set(name tidy-share)
     if (UNIX AND APPLE)
         set(CMAKE_MACOSX_RPATH 1)
     endif ()
@@ -410,11 +436,10 @@ if (BUILD_SHARED_LIB)
                                    OUTPUT_NAME ${LIB_NAME} )
     set_target_properties( ${name} PROPERTIES
                                    VERSION   ${LIBTIDY_VERSION}
-                                   SOVERSION ${TIDY_MAJOR_VERSION} )
+                                   SOVERSION ${TIDY_SO_VERSION}
+                                   NO_SONAME ${NO_SONAME} )
     set_target_properties( ${name} PROPERTIES 
-                                   COMPILE_FLAGS "-DBUILD_SHARED_LIB" )
-    set_target_properties( ${name} PROPERTIES 
-                                   COMPILE_FLAGS "-DBUILDING_SHARED_LIB" )
+                                   COMPILE_FLAGS "-DBUILD_SHARED_LIB -DBUILDING_SHARED_LIB")
     install(TARGETS ${name}
         RUNTIME DESTINATION ${BIN_INSTALL_DIR}
         ARCHIVE DESTINATION ${LIB_INSTALL_DIR}
@@ -432,12 +457,20 @@ endif ()
 #   shared library.
 #------------------------------------------------------------------------
 if (SUPPORT_CONSOLE_APP)
-    set(name ${LIB_NAME}exe)
+    set(name ${LIB_NAME})
     set ( BINDIR console )
     add_executable( ${name} ${BINDIR}/tidy.c )
     target_link_libraries( ${name} ${add_LIBS} )
     if (MSVC)
-        set_target_properties( ${name} PROPERTIES DEBUG_POSTFIX _debug )
+        set_target_properties( ${name} PROPERTIES DEBUG_POSTFIX d )
+    endif ()
+    if (APPLE)
+        string(TIMESTAMP CURRENT_YEAR "%Y")
+        configure_file(
+            ${CMAKE_CURRENT_SOURCE_DIR}/console/Info.plist.in 
+            ${CMAKE_CURRENT_BINARY_DIR}/Info.plist
+        )
+        target_link_options(${name} PRIVATE LINKER:-sectcreate,__TEXT,__info_plist,Info.plist)
     endif ()
     if (NOT TIDY_CONSOLE_SHARED)
         set_target_properties( ${name} PROPERTIES 
@@ -454,7 +487,7 @@ if (BUILD_TAB2SPACE)
     set(name tab2space)
     add_executable( ${name} ${BINDIR}/tab2space.c )
     if (MSVC)
-        set_target_properties( ${name} PROPERTIES DEBUG_POSTFIX _debug )
+        set_target_properties( ${name} PROPERTIES DEBUG_POSTFIX d )
     endif ()
     # no INSTALL of this 'local' tool - use depreciated
 endif ()
@@ -464,7 +497,7 @@ if (BUILD_SAMPLE_CODE)
     set(dir console)
     add_executable( ${name} ${dir}/${name}.cxx )
     if (MSVC)
-        set_target_properties( ${name} PROPERTIES DEBUG_POSTFIX _debug )
+        set_target_properties( ${name} PROPERTIES DEBUG_POSTFIX d )
     endif ()
     target_link_libraries( ${name} ${add_LIBS} )
     # no INSTALL of this 'local' sample
@@ -560,6 +593,8 @@ endif ()
 # Windows
 #   MSI - this needs WiX Tooset installed and a path to candle.exe
 #   EXE - this needs NSIS tools to be in path
+# Everything Else
+#   RPM required to build RPM's, and might not be installed by default.
 #------------------------------------------------------------------------
 if (WIN32)
     set(CPACK_GENERATOR "NSIS;WIX;ZIP")
@@ -588,10 +623,23 @@ set(CPACK_PACKAGE_VERSION_MINOR "${TIDY_MINOR_VERSION}")
 set(CPACK_PACKAGE_VERSION_PATCH "${TIDY_POINT_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README/README.html")
 
-# use one compatible license file for all
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/README/LICENSE.txt")
-set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README/README.html")
-set(CPACK_RESOURCE_FILE_WELCOME "${CMAKE_CURRENT_SOURCE_DIR}/README/README.html")
+
+#------------------------------------------------------------------------
+# Windows: it looks like only the LICENSE.txt file is used by Windows,
+#   for either package type (.exe and .msi).
+# Linux: none of the files are shown publicly by default when installing
+#   from a .deb or .rpm.
+# Mac: cannot show HTML; need RTF. CPACK_RESOURCE_FILE_WELCOME isn't
+#   needed.
+#------------------------------------------------------------------------
+if (APPLE)
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/build/macos/Installer-License.rtf")
+    set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/build/macos/Installer-Introduction.rtf")
+else ()
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/README/LICENSE.txt")
+    set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README/README.html")
+    set(CPACK_RESOURCE_FILE_WELCOME "${CMAKE_CURRENT_SOURCE_DIR}/README/README.html")
+endif ()
 
 
 #------------------------------------------------------------------------
@@ -599,25 +647,44 @@ set(CPACK_RESOURCE_FILE_WELCOME "${CMAKE_CURRENT_SOURCE_DIR}/README/README.html"
 #------------------------------------------------------------------------
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER ${CPACK_PACKAGE_CONTACT})
 set(CPACK_DEBIAN_PACKAGE_HOMEPAGE ${LIBTIDY_URL})
-#set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc")
 set(CPACK_DEBIAN_PACKAGE_SECTION "Libraries")
-set(CPACK_SOURCE_IGNORE_FILES
-  "${PROJECT_SOURCE_DIR}/build"
-  )
+set(CPACK_SOURCE_IGNORE_FILES "${PROJECT_SOURCE_DIR}/build" )
 
 
 #------------------------------------------------------------------------
 # RPM config
 #------------------------------------------------------------------------
 set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION "/usr/share/man" "/usr/share/man/man1")
-
 set(CPACK_SOURCE_IGNORE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/test/;${CMAKE_CURRENT_SOURCE_DIR}/build/;${CMAKE_CURRENT_SOURCE_DIR}/.git/")
 
-if (NOT WIN32 AND NOT APPLE)
-set( CPACK_PACKAGE_FILE_NAME "${LIB_NAME}-${CPACK_PACKAGE_VERSION}-${BITNESS}bit" )
+
+#------------------------------------------------------------------------
+# Package name configuration
+#   The default is LIB_NAME-CPACK_PACKAGE_VERSION-CMAKE_SYSTEM_NAME,
+#   but we want to include system name for Unixes, and correct the
+#   system name on Apple targets.
+#------------------------------------------------------------------------
+if (UNIX AND NOT APPLE)
+    set(CPACK_PACKAGE_FILE_NAME "${LIB_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}-${BITNESS}bit")
+endif ()
+if (APPLE AND NOT IOS)
+    if (CMAKE_OSX_ARCHITECTURES)
+        set(CPACK_PACKAGE_FILE_NAME "${LIB_NAME}-${CPACK_PACKAGE_VERSION}-macOS-${CMAKE_OSX_ARCHITECTURES}")
+        string(REPLACE ";" "+" CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}")
+    else ()
+        set(CPACK_PACKAGE_FILE_NAME "${LIB_NAME}-${CPACK_PACKAGE_VERSION}-macOS-${BITNESS}bit")
+    endif ()
+endif ()
+if (IOS)
+    set(CPACK_PACKAGE_FILE_NAME "${LIB_NAME}-${CPACK_PACKAGE_VERSION}-iOS-${BITNESS}bit")
 endif ()
 
+
+#------------------------------------------------------------------------
+# Build the Package
+#------------------------------------------------------------------------
 include(CPack)
+
 
 #------------------------------------------------------------------------
 # pkg-config
