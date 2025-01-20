@@ -384,7 +384,7 @@ endif ()
 set(name tidy_a)
 add_library ( ${name} STATIC ${CFILES} ${HFILES} ${LIBHFILES} )
 set_target_properties( ${name} PROPERTIES 
-                       OUTPUT_NAME ${LIB_NAME}s )
+                       OUTPUT_NAME ${LIB_NAME}_a )
 if (NOT TIDY_CONSOLE_SHARED) # user wants default static linkage
     list ( APPEND add_LIBS ${name} )
 endif ()    
